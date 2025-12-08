@@ -1,4 +1,11 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import { ThemedText } from '@/components/themed-text';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { database } from '@/services/database';
+import { CATEGORIES, DEFAULT_DURATION, formatTime } from '@/utils/constants';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     Alert,
     Animated,
@@ -10,17 +17,10 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {Picker} from '@react-native-picker/picker';
-import {ThemedText} from '@/components/themed-text';
-import {database} from '@/services/database';
-import {CATEGORIES, DEFAULT_DURATION, formatTime} from '@/utils/constants';
-import {Colors} from '@/constants/theme';
-import {useColorScheme} from '@/hooks/use-color-scheme';
-import {MaterialCommunityIcons} from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const {width: screenWidth, height: screenHeight} = Dimensions.get('window');
-const timerSize = Math.min(screenWidth * 0.6, screenHeight * 0.3, 280);
+const timerSize = Math.min(screenWidth * 0.7, screenHeight * 0.35, 300);
 
 export default function TimerScreen() {
     const colorScheme = useColorScheme();
@@ -117,23 +117,14 @@ export default function TimerScreen() {
     }, [handlePause]);
 
     const handleStop = useCallback(() => {
-        Alert.alert('Seansı Sonlandır', 'Seansı bitirmek istediğinize emin misiniz?',
-            [
-                {text: 'İptal', style: 'cancel'},
-                {
-                    text: 'Evet, Bitir',
-                    onPress: () => {
-                        handlePause();
-                        const duration = DEFAULT_DURATION - timeLeft;
-                        setSessionDuration(duration);
-                        setSessionCompleted(false);
-                        saveSession(duration, false);
-                        setShowSummary(true);
-                    },
-                },
-            ]
-        );
-    }, [timeLeft, handlePause, saveSession]);
+        if (!isRunning && timeLeft === DEFAULT_DURATION) return; // nothing to stop
+        handlePause();
+        const duration = DEFAULT_DURATION - timeLeft;
+        setSessionDuration(duration);
+        setSessionCompleted(false);
+        saveSession(duration, false);
+        setShowSummary(true);
+    }, [isRunning, timeLeft, handlePause, saveSession]);
 
     const closeSummary = useCallback(() => {
         setShowSummary(false);
@@ -163,10 +154,19 @@ export default function TimerScreen() {
                           selectedValue={category}
                           onValueChange={setCategory}
                           enabled={!isRunning}
-                          style={[styles.picker, {color: colors.text}]}
-                          itemStyle={{color: colors.text, backgroundColor: colors.card}}
+                          mode="dropdown"
+                          dropdownIconColor={colors.text}
+                          style={[styles.picker, {color: colors.text, backgroundColor: colors.card}]}
                       >
-                          {CATEGORIES.map(cat => <Picker.Item key={cat} label={cat} value={cat}/>)}
+                          {CATEGORIES.map(cat => (
+                              <Picker.Item 
+                                  key={cat} 
+                                  label={cat} 
+                                  value={cat} 
+                                  color={colorScheme === 'dark' ? '#ffffff' : '#000000'}
+                                  style={{backgroundColor: colorScheme === 'dark' ? '#1e1e1e' : '#ffffff'}}
+                              />
+                          ))}
                       </Picker>
                   </View>
               </View>
@@ -200,25 +200,56 @@ export default function TimerScreen() {
 
           <Modal visible={showSummary} transparent animationType="fade">
               <View style={styles.modalOverlay}>
-                  <View style={[styles.modalContent, {backgroundColor: colors.card, borderColor: colors.border}]}>
-                      <ThemedText type="title"
-                                  style={styles.modalTitle}>{sessionCompleted ? 'Harika İş!' : 'Seans Özeti'}</ThemedText>
-                      {sessionCompleted &&
-                          <ThemedText style={[styles.modalSubtitle, {color: colors.success}]}>Odaklanma seansını
-                              başarıyla tamamladın!</ThemedText>}
-                      <View style={styles.summaryRow}><ThemedText
-                          style={styles.summaryLabel}>Kategori:</ThemedText><ThemedText
-                          style={[styles.summaryValue, {color: colors.primary}]}>{category}</ThemedText></View>
-                      <View style={styles.summaryRow}><ThemedText
-                          style={styles.summaryLabel}>Süre:</ThemedText><ThemedText
-                          style={[styles.summaryValue, {color: colors.primary}]}>{formatTime(sessionDuration)}</ThemedText></View>
-                      <View style={styles.summaryRow}><ThemedText
-                          style={styles.summaryLabel}>Kaçış:</ThemedText><ThemedText
-                          style={[styles.summaryValue, {color: colors.primary}]}>{distractions}</ThemedText></View>
+                  <View style={[styles.modalContent, {backgroundColor: colors.card}]}>
+                      <View style={[styles.modalHeader, {backgroundColor: sessionCompleted ? colors.success : colors.primary}]}>
+                          <MaterialCommunityIcons 
+                              name={sessionCompleted ? "check-circle" : "information"} 
+                              size={40} 
+                              color="#ffffff" 
+                          />
+                          <ThemedText style={styles.modalTitle}>
+                              {sessionCompleted ? 'Harika İş!' : 'Seans Özeti'}
+                          </ThemedText>
+                          {sessionCompleted && (
+                              <ThemedText style={styles.modalSubtitle}>
+                                  Odaklanma seansını başarıyla tamamladın!
+                              </ThemedText>
+                          )}
+                      </View>
+                      
+                      <View style={styles.modalBody}>
+                          <View style={[styles.summaryCard, {backgroundColor: colors.background}]}>
+                              <MaterialCommunityIcons name="format-list-bulleted-type" size={18} color={colors.text} />
+                              <View style={styles.summaryCardContent}>
+                                  <ThemedText style={[styles.summaryLabel, {color: colors.text}]}>Kategori</ThemedText>
+                                  <ThemedText style={[styles.summaryValue, {color: colors.text}]}>{category}</ThemedText>
+                              </View>
+                          </View>
+                          
+                          <View style={[styles.summaryCard, {backgroundColor: colors.background}]}>
+                              <MaterialCommunityIcons name="clock-outline" size={18} color={colors.text} />
+                              <View style={styles.summaryCardContent}>
+                                  <ThemedText style={[styles.summaryLabel, {color: colors.text}]}>Süre</ThemedText>
+                                  <ThemedText style={[styles.summaryValue, {color: colors.text}]}>{formatTime(sessionDuration)}</ThemedText>
+                              </View>
+                          </View>
+                          
+                          <View style={[styles.summaryCard, {backgroundColor: colors.background}]}>
+                              <MaterialCommunityIcons name="exit-run" size={18} color={colors.text} />
+                              <View style={styles.summaryCardContent}>
+                                  <ThemedText style={[styles.summaryLabel, {color: colors.text}]}>Kaçış</ThemedText>
+                                  <ThemedText style={[styles.summaryValue, {color: colors.text}]}>{distractions}</ThemedText>
+                              </View>
+                          </View>
+                      </View>
+                      
                       <TouchableOpacity
-                          style={[styles.button, {backgroundColor: colors.primary, marginTop: 24, width: '100%'}]}
-                          onPress={closeSummary}><ThemedText
-                          style={styles.buttonText}>Kapat</ThemedText></TouchableOpacity>
+                          style={[styles.modalButton, {backgroundColor: colors.primary}]}
+                          onPress={closeSummary}
+                          activeOpacity={0.8}
+                      >
+                          <ThemedText style={styles.modalButtonText}>Kapat</ThemedText>
+                      </TouchableOpacity>
                   </View>
               </View>
           </Modal>
@@ -233,13 +264,13 @@ const styles = StyleSheet.create({
     content: {
         flexGrow: 1,
         paddingHorizontal: 20,
-        paddingTop: 40,
-        paddingBottom: 40,
+        paddingTop: 20,
+        paddingBottom: 100,
     },
     title: {
         textAlign: 'center',
-        fontSize: 28,
-        marginBottom: 15,
+        fontSize: 24,
+        marginBottom: 10,
     },
     timerCircle: {
         width: timerSize,
@@ -249,7 +280,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         alignSelf: 'center',
-        marginVertical: 20,
+        marginVertical: 15,
         elevation: 10,
         shadowColor: '#000',
         shadowOffset: {width: 0, height: 5},
@@ -257,15 +288,16 @@ const styles = StyleSheet.create({
         shadowRadius: 10,
     },
     timerText: {
-        fontSize: Math.min(48, timerSize / 4.5),
+        fontSize: Math.min(56, timerSize / 4),
         fontWeight: '600',
         fontVariant: ['tabular-nums'],
+        lineHeight: Math.min(72, timerSize / 3.2),
     },
     controlsContainer: {
         marginVertical: 15,
     },
     card: {
-        paddingVertical: 12,
+        paddingVertical: 16,
         paddingHorizontal: 16,
         borderRadius: 12,
         elevation: 2,
@@ -277,6 +309,7 @@ const styles = StyleSheet.create({
     pickerHeader: {
         flexDirection: 'row',
         alignItems: 'center',
+        marginBottom: 8,
     },
     cardTitle: {
         fontSize: 16,
@@ -285,35 +318,36 @@ const styles = StyleSheet.create({
     },
     picker: {
         width: '100%',
-        height: 50,
+        height: 60,
+        marginTop: 4,
     },
     buttonsContainer: {
-    flexDirection: 'row',
+        flexDirection: 'row',
         justifyContent: 'center',
-        gap: 20,
-        marginVertical: 15,
+        gap: 15,
+        marginVertical: 12,
     },
     button: {
         flex: 1,
         flexDirection: 'row',
-        maxWidth: 160,
-        paddingVertical: 16,
+        maxWidth: 150,
+        paddingVertical: 14,
         borderRadius: 12,
-    alignItems: 'center',
+        alignItems: 'center',
         justifyContent: 'center',
         elevation: 3,
         shadowColor: '#000',
         shadowOffset: {width: 0, height: 2},
         shadowOpacity: 0.1,
         shadowRadius: 4,
-        gap: 10,
+        gap: 8,
     },
     stopButton: {
         backgroundColor: '#d9534f',
   },
     buttonText: {
         color: '#ffffff',
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: 'bold',
   },
     resetButton: {
@@ -326,39 +360,78 @@ const styles = StyleSheet.create({
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.6)',
+        backgroundColor: 'rgba(0,0,0,0.7)',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
     },
     modalContent: {
         width: '100%',
-        maxWidth: 350,
-        padding: 24,
+        maxWidth: 300,
         borderRadius: 16,
-        borderWidth: 1,
+        overflow: 'hidden',
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 10},
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+    },
+    modalHeader: {
+        paddingVertical: 20,
+        paddingHorizontal: 16,
         alignItems: 'center',
+        gap: 8,
     },
     modalTitle: {
-        marginBottom: 12,
-        fontSize: 24,
-    },
-    modalSubtitle: {
-        marginBottom: 24,
-        fontSize: 16,
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#ffffff',
         textAlign: 'center',
     },
-    summaryRow: {
+    modalSubtitle: {
+        fontSize: 13,
+        color: '#ffffff',
+        textAlign: 'center',
+        opacity: 0.95,
+        paddingHorizontal: 10,
+    },
+    modalBody: {
+        padding: 16,
+        gap: 10,
+    },
+    summaryCard: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        width: '100%',
-        marginBottom: 16,
+        alignItems: 'center',
+        padding: 12,
+        borderRadius: 10,
+        gap: 10,
+    },
+    summaryCardContent: {
+        flex: 1,
     },
     summaryLabel: {
-        fontSize: 16,
-        opacity: 0.8,
+        fontSize: 12,
+        opacity: 0.7,
+        marginBottom: 3,
     },
     summaryValue: {
+        fontSize: 15,
+        fontWeight: 'bold',
+    },
+    modalButton: {
+        marginHorizontal: 16,
+        marginBottom: 16,
+        paddingVertical: 14,
+        borderRadius: 10,
+        alignItems: 'center',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 2},
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    modalButtonText: {
+        color: '#ffffff',
         fontSize: 16,
         fontWeight: 'bold',
   },

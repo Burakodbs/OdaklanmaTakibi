@@ -1,14 +1,14 @@
-import {useCallback, useState} from 'react';
-import {Dimensions, RefreshControl, ScrollView, StyleSheet, View} from 'react-native';
-import {BarChart, PieChart} from 'react-native-chart-kit';
-import {ThemedText} from '@/components/themed-text';
-import {database, FocusSession} from '@/services/database';
-import {formatDuration} from '@/utils/constants';
-import {useColorScheme} from '@/hooks/use-color-scheme';
-import {Colors} from '@/constants/theme';
-import {useFocusEffect} from '@react-navigation/native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {MaterialCommunityIcons} from '@expo/vector-icons';
+import { ThemedText } from '@/components/themed-text';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { database, FocusSession } from '@/services/database';
+import { formatDuration } from '@/utils/constants';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useState } from 'react';
+import { Alert, Dimensions, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { BarChart, PieChart } from 'react-native-chart-kit';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ReportsScreen() {
     const colorScheme = useColorScheme();
@@ -40,6 +40,43 @@ export default function ReportsScreen() {
         await loadData();
         setRefreshing(false);
     }, []);
+
+    const handleAddFakeData = async () => {
+        Alert.alert(
+            'Test Verisi Ekle',
+            'Son 7 gün için fake veriler eklenecek. Onaylıyor musunuz?',
+            [
+                { text: 'İptal', style: 'cancel' },
+                {
+                    text: 'Ekle',
+                    onPress: async () => {
+                        await database.addFakeData();
+                        await loadData();
+                        Alert.alert('Başarılı', 'Test verileri eklendi!');
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleClearData = async () => {
+        Alert.alert(
+            'Tüm Verileri Sil',
+            'Tüm kayıtlar silinecek. Bu işlem geri alınamaz!',
+            [
+                { text: 'İptal', style: 'cancel' },
+                {
+                    text: 'Sil',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await database.clearAllData();
+                        await loadData();
+                        Alert.alert('Başarılı', 'Tüm veriler silindi!');
+                    }
+                }
+            ]
+        );
+    };
 
     const loadData = async () => {
         try {
@@ -74,7 +111,8 @@ export default function ReportsScreen() {
 
         const durations = last7Days.map(day => {
             const daySessions = sessions.filter(s => s.date.startsWith(day));
-            return daySessions.reduce((sum, s) => sum + s.duration, 0) / 60; // minutes
+            const minutes = Math.round(daySessions.reduce((sum, s) => sum + s.duration, 0) / 60);
+            return minutes > 0 ? minutes : 0; // return actual minutes or 0
         });
 
         setWeeklyData({labels: dayLabels, datasets: [{data: durations}]});
@@ -88,15 +126,21 @@ export default function ReportsScreen() {
             categoryMap.set(s.category, (categoryMap.get(s.category) || 0) + s.duration);
         });
 
+        const total = Array.from(categoryMap.values()).reduce((sum, duration) => sum + duration, 0);
+
         const data = Array.from(categoryMap.entries())
             .filter(([_, duration]) => duration > 0)
-            .map(([name, duration], index) => ({
-                name,
-                population: duration / 60, // minutes
-                color: categoryColors[index % categoryColors.length],
-                legendFontColor: colors.text,
-                legendFontSize: 12,
-            }));
+            .map(([name, duration], index) => {
+                const minutes = Math.round(duration / 60);
+                const percentage = ((duration / total) * 100).toFixed(1);
+                return {
+                    name: `${name}: ${minutes}dk`,
+                    population: parseFloat(percentage),
+                    color: categoryColors[index % categoryColors.length],
+                    legendFontColor: colorScheme === 'dark' ? '#FFFFFF' : '#1C1C1E',
+                    legendFontSize: 12,
+                };
+            });
 
         setCategoryData(data);
     };
@@ -125,6 +169,23 @@ export default function ReportsScreen() {
                                               tintColor={colors.primary}/>}
           >
               <ThemedText type="title" style={styles.title}>Raporlar</ThemedText>
+
+              <View style={styles.devButtonsContainer}>
+                  <TouchableOpacity 
+                      style={[styles.devButton, {backgroundColor: colors.primary}]} 
+                      onPress={handleAddFakeData}
+                  >
+                      <MaterialCommunityIcons name="database-plus" size={18} color="#fff" />
+                      <ThemedText style={styles.devButtonText}>Test Verisi Ekle</ThemedText>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                      style={[styles.devButton, {backgroundColor: '#d9534f'}]} 
+                      onPress={handleClearData}
+                  >
+                      <MaterialCommunityIcons name="delete-sweep" size={18} color="#fff" />
+                      <ThemedText style={styles.devButtonText}>Tümünü Sil</ThemedText>
+                  </TouchableOpacity>
+              </View>
 
               <View style={styles.statsGrid}>
                   <View style={[styles.statCard, {backgroundColor: colors.card}]}>
@@ -155,40 +216,41 @@ export default function ReportsScreen() {
                   </View>
               ) : (
                   <>
-                      {weeklyData.datasets[0].data.some(v => v > 0) && (
-                          <View style={[styles.chartWrapper, {backgroundColor: colors.card}]}>
-                              <ThemedText style={[styles.chartTitle, {color: colors.text}]}>Haftalık Aktivite
-                                  (dakika)</ThemedText>
-                              <BarChart
-                                  data={weeklyData}
-                                  width={screenWidth - 40}
-                                  height={280}
-                                  chartConfig={chartConfig}
-                                  style={styles.chart}
-                                  yAxisLabel=""
-                                  yAxisSuffix=" dk"
-                                  yAxisInterval={1}
-                                  fromZero
-                                  showValuesOnTopOfBars
-                                  verticalLabelRotation={0}
-                              />
-                          </View>
-                      )}
+                      <View style={[styles.chartWrapper, {backgroundColor: colors.card}]}>
+                          <ThemedText style={[styles.chartTitle, {color: colors.text}]}>Haftalık Aktivite</ThemedText>
+                          <BarChart
+                              data={weeklyData}
+                              width={screenWidth - 60}
+                              height={220}
+                              chartConfig={chartConfig}
+                              style={styles.chart}
+                              yAxisLabel=""
+                              yAxisSuffix="dk"
+                              yAxisInterval={1}
+                              fromZero
+                              showValuesOnTopOfBars
+                              verticalLabelRotation={0}
+                          />
+                      </View>
 
                       {categoryData.length > 0 && (
                           <View style={[styles.chartWrapper, {backgroundColor: colors.card}]}>
-                              <ThemedText style={[styles.chartTitle, {color: colors.text}]}>Kategori
-                                  Dağılımı</ThemedText>
+                              <ThemedText style={[styles.chartTitle, {color: colors.text}]}>Kategori Dağılımı</ThemedText>
                               <PieChart
                                   data={categoryData}
-                                  width={screenWidth - 40}
-                                  height={280}
-                                  chartConfig={chartConfig}
+                                  width={screenWidth - 60}
+                                  height={200}
+                                  chartConfig={{
+                                      ...chartConfig,
+                                      color: (opacity = 1) => colorScheme === 'dark' ? `rgba(255, 255, 255, ${opacity})` : `rgba(28, 28, 30, ${opacity})`,
+                                  }}
                                   accessor={"population"}
                                   backgroundColor={"transparent"}
-                                  paddingLeft={"40"}
+                                  paddingLeft={"5"}
                                   center={[10, 0]}
-                                  absolute
+                                  hasLegend={true}
+                                  avoidFalseZero={true}
+                                  absolute={false}
                               />
                           </View>
                       )}
@@ -205,21 +267,44 @@ const styles = StyleSheet.create({
     },
     container: {
         padding: 20,
-        paddingBottom: 40,
+        paddingBottom: 100,
   },
     title: {
         textAlign: 'center',
-        marginBottom: 30,
-        fontSize: 28,
+        marginBottom: 25,
+        fontSize: 24,
+    },
+    devButtonsContainer: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 20,
+        paddingHorizontal: 5,
+    },
+    devButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        gap: 6,
+    },
+    devButtonText: {
+        color: '#ffffff',
+        fontSize: 13,
+        fontWeight: '600',
     },
     statsGrid: {
-    flexDirection: 'row',
-        gap: 12,
-        marginBottom: 30,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+        marginBottom: 25,
     },
     statCard: {
         flex: 1,
-        padding: 16,
+        minWidth: 100,
+        padding: 14,
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
@@ -228,21 +313,23 @@ const styles = StyleSheet.create({
         shadowOffset: {width: 0, height: 1},
         shadowOpacity: 0.05,
         shadowRadius: 2,
-    gap: 8,
+        gap: 6,
   },
     statLabel: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '500',
         opacity: 0.7,
+        textAlign: 'center',
     },
     statValue: {
-        fontSize: 22,
+        fontSize: 18,
         fontWeight: 'bold',
     },
     chartWrapper: {
         borderRadius: 16,
-        paddingVertical: 16,
-        marginBottom: 20,
+        paddingVertical: 12,
+        paddingHorizontal: 8,
+        marginBottom: 18,
         alignItems: 'center',
         elevation: 2,
         shadowColor: '#000',
@@ -251,10 +338,10 @@ const styles = StyleSheet.create({
         shadowRadius: 2,
     },
     chartTitle: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: 'bold',
-        marginBottom: 15,
-        paddingHorizontal: 16,
+        marginBottom: 12,
+        paddingHorizontal: 12,
         alignSelf: 'flex-start',
     },
     chart: {

@@ -1,12 +1,12 @@
-import {DarkTheme, DefaultTheme, ThemeProvider} from '@react-navigation/native';
-import {Stack} from 'expo-router';
-import {StatusBar} from 'expo-status-bar';
-import {useEffect} from 'react';
-import 'react-native-reanimated';
-import {SafeAreaProvider} from 'react-native-safe-area-context';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { Platform } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import {useColorScheme} from '@/hooks/use-color-scheme';
-import {database} from '@/services/database';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { database } from '@/services/database';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -16,7 +16,10 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
     useEffect(() => {
-        database.init();
+        // Only initialize database on native platforms
+        if (Platform.OS !== 'web') {
+            database.init();
+        }
     }, []);
 
   return (
