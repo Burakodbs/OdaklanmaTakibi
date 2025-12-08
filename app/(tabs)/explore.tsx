@@ -29,17 +29,84 @@ export default function ReportsScreen() {
     }[]>([]);
     const [refreshing, setRefreshing] = useState(false);
 
+    const processWeeklyData = useCallback((sessions: FocusSession[]) => {
+        const dayLabels: string[] = [];
+        const last7Days = Array.from({length: 7}, (_, i) => {
+            const date = new Date();
+            date.setDate(date.getDate() - (6 - i));
+            const dayNames = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+            dayLabels.push(dayNames[date.getDay()]);
+            return date.toISOString().split('T')[0];
+        });
+
+        const durations = last7Days.map(day => {
+            const daySessions = sessions.filter(s => s.date.startsWith(day));
+            const minutes = Math.round(daySessions.reduce((sum, s) => sum + s.duration, 0) / 60);
+            return minutes > 0 ? minutes : 0; // return actual minutes or 0
+        });
+
+        setWeeklyData({labels: dayLabels, datasets: [{data: durations}]});
+    }, []);
+
+    const processCategoryData = useCallback((sessions: FocusSession[]) => {
+        const categoryColors = [colors.primary, colors.secondary, '#FF6F00', '#2962FF', '#00BFA5', '#D500F9'];
+        const categoryMap = new Map<string, number>();
+
+        sessions.forEach(s => {
+            categoryMap.set(s.category, (categoryMap.get(s.category) || 0) + s.duration);
+        });
+
+        const total = Array.from(categoryMap.values()).reduce((sum, duration) => sum + duration, 0);
+
+        const data = Array.from(categoryMap.entries())
+            .filter(([_, duration]) => duration > 0)
+            .map(([name, duration], index) => {
+                const minutes = Math.round(duration / 60);
+                const percentage = ((duration / total) * 100).toFixed(1);
+                return {
+                    name: `${name}: ${minutes}dk`,
+                    population: parseFloat(percentage),
+                    color: categoryColors[index % categoryColors.length],
+                    legendFontColor: colorScheme === 'dark' ? '#FFFFFF' : '#1C1C1E',
+                    legendFontSize: 12,
+                };
+            });
+
+        setCategoryData(data);
+    }, [colors.primary, colors.secondary, colorScheme]);
+
+    const loadData = useCallback(async () => {
+        try {
+            const todaySessions = await database.getTodaySessions();
+            const allSessions = await database.getAllSessions();
+            const weeklySessions = await database.getSessionsByDateRange(7);
+
+            const todayTotal = todaySessions.reduce((sum, s) => sum + s.duration, 0);
+            const allTotal = allSessions.reduce((sum, s) => sum + s.duration, 0);
+            const allDistractions = allSessions.reduce((sum, s) => sum + s.distractions, 0);
+
+            setTodayDuration(todayTotal);
+            setTotalDuration(allTotal);
+            setTotalDistractions(allDistractions);
+
+            processWeeklyData(weeklySessions);
+            processCategoryData(allSessions);
+        } catch (error) {
+            console.error('Veri yüklenemedi:', error);
+        }
+    }, [processWeeklyData, processCategoryData]);
+
     useFocusEffect(
         useCallback(() => {
             loadData();
-        }, [])
+        }, [loadData])
     );
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         await loadData();
         setRefreshing(false);
-    }, []);
+    }, [loadData]);
 
     const handleAddFakeData = async () => {
         Alert.alert(
@@ -76,73 +143,6 @@ export default function ReportsScreen() {
                 }
             ]
         );
-    };
-
-    const loadData = async () => {
-        try {
-            const todaySessions = await database.getTodaySessions();
-            const allSessions = await database.getAllSessions();
-            const weeklySessions = await database.getSessionsByDateRange(7);
-
-            const todayTotal = todaySessions.reduce((sum, s) => sum + s.duration, 0);
-            const allTotal = allSessions.reduce((sum, s) => sum + s.duration, 0);
-            const allDistractions = allSessions.reduce((sum, s) => sum + s.distractions, 0);
-
-            setTodayDuration(todayTotal);
-            setTotalDuration(allTotal);
-            setTotalDistractions(allDistractions);
-
-            processWeeklyData(weeklySessions);
-            processCategoryData(allSessions);
-        } catch (error) {
-            console.error('Veri yüklenemedi:', error);
-        }
-    };
-
-    const processWeeklyData = (sessions: FocusSession[]) => {
-        const dayLabels: string[] = [];
-        const last7Days = Array.from({length: 7}, (_, i) => {
-            const date = new Date();
-            date.setDate(date.getDate() - (6 - i));
-            const dayNames = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
-            dayLabels.push(dayNames[date.getDay()]);
-            return date.toISOString().split('T')[0];
-        });
-
-        const durations = last7Days.map(day => {
-            const daySessions = sessions.filter(s => s.date.startsWith(day));
-            const minutes = Math.round(daySessions.reduce((sum, s) => sum + s.duration, 0) / 60);
-            return minutes > 0 ? minutes : 0; // return actual minutes or 0
-        });
-
-        setWeeklyData({labels: dayLabels, datasets: [{data: durations}]});
-    };
-
-    const processCategoryData = (sessions: FocusSession[]) => {
-        const categoryColors = [colors.primary, colors.secondary, '#FF6F00', '#2962FF', '#00BFA5', '#D500F9'];
-        const categoryMap = new Map<string, number>();
-
-        sessions.forEach(s => {
-            categoryMap.set(s.category, (categoryMap.get(s.category) || 0) + s.duration);
-        });
-
-        const total = Array.from(categoryMap.values()).reduce((sum, duration) => sum + duration, 0);
-
-        const data = Array.from(categoryMap.entries())
-            .filter(([_, duration]) => duration > 0)
-            .map(([name, duration], index) => {
-                const minutes = Math.round(duration / 60);
-                const percentage = ((duration / total) * 100).toFixed(1);
-                return {
-                    name: `${name}: ${minutes}dk`,
-                    population: parseFloat(percentage),
-                    color: categoryColors[index % categoryColors.length],
-                    legendFontColor: colorScheme === 'dark' ? '#FFFFFF' : '#1C1C1E',
-                    legendFontSize: 12,
-                };
-            });
-
-        setCategoryData(data);
     };
 
     const screenWidth = Dimensions.get('window').width;
