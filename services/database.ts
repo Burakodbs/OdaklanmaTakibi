@@ -10,20 +10,24 @@ export interface FocusSession {
   completed: boolean;
 }
 
+/**
+ * DatabaseService - Manages all focus session data and achievements
+ * Uses expo-sqlite for native platforms, mock data for web
+ */
 class DatabaseService {
   private db: SQLiteType.SQLiteDatabase | null = null;
   private initialized = false;
   private initializing = false;
 
+  /** Initializes database connection (skips on web platform) */
   async init() {
-    // Skip SQLite initialization on web platform
+    // Web doesn't support SQLite
     if (Platform.OS === 'web') {
-      console.warn('SQLite is not supported on web platform. Using mock data.');
+      console.warn('SQLite not available on web. Using mock data.');
       this.initialized = true;
       return;
     }
 
-    // Prevent multiple initializations
     if (this.initialized || this.initializing) {
       return;
     }
@@ -31,18 +35,18 @@ class DatabaseService {
     this.initializing = true;
     
     try {
-      // Dynamically import SQLite only on native platforms
       const SQLite = await import('expo-sqlite');
       this.db = await SQLite.openDatabaseAsync('focusapp.db');
       await this.createTables();
       this.initialized = true;
     } catch (error) {
-      console.error('Failed to initialize database:', error);
+      console.error('Database initialization failed:', error);
     } finally {
       this.initializing = false;
     }
   }
 
+  /** Creates required database tables */
   private async createTables() {
     if (!this.db) return;
 
@@ -55,9 +59,15 @@ class DatabaseService {
         date TEXT NOT NULL,
         completed INTEGER NOT NULL
       );
+      
+      CREATE TABLE IF NOT EXISTS achievements (
+        id TEXT PRIMARY KEY,
+        unlockedAt TEXT NOT NULL
+      );
     `);
   }
 
+  /** Adds a new focus session to database */
   async addSession(session: FocusSession): Promise<void> {
     if (Platform.OS === 'web') {
       console.log('Mock: Session added', session);
@@ -77,6 +87,7 @@ class DatabaseService {
     );
   }
 
+  /** Retrieves all focus sessions */
   async getAllSessions(): Promise<FocusSession[]> {
     if (Platform.OS === 'web') {
       return [];
@@ -92,6 +103,7 @@ class DatabaseService {
     return result;
   }
 
+  /** Retrieves today's focus sessions */
   async getTodaySessions(): Promise<FocusSession[]> {
     if (Platform.OS === 'web') {
       return [];
@@ -109,6 +121,7 @@ class DatabaseService {
     return result;
   }
 
+  /** Retrieves sessions from past N days */
   async getSessionsByDateRange(days: number): Promise<FocusSession[]> {
     if (Platform.OS === 'web') {
       return [];
@@ -129,6 +142,7 @@ class DatabaseService {
     return result;
   }
 
+  /** Generates 30 days of mock data for testing and development */
   async addFakeData(): Promise<void> {
     if (Platform.OS === 'web') {
       console.log('Mock: Fake data added');
@@ -141,22 +155,22 @@ class DatabaseService {
     const categories = ['Ders Çalışma', 'Kodlama', 'Proje', 'Kitap Okuma', 'Diğer'];
     const now = new Date();
 
-    // Son 7 gün için fake veriler
-    for (let i = 0; i < 7; i++) {
+    // Generates 30 days of test sessions
+    for (let i = 0; i < 30; i++) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
       
-      // Her gün için 2-4 seans
-      const sessionsCount = Math.floor(Math.random() * 3) + 2;
+      // 2-5 sessions per day
+      const sessionsCount = Math.floor(Math.random() * 4) + 2;
       
       for (let j = 0; j < sessionsCount; j++) {
         const category = categories[Math.floor(Math.random() * categories.length)];
-        const duration = Math.floor(Math.random() * 3600) + 600; // 10-70 dakika arası (saniye cinsinden)
-        const distractions = Math.floor(Math.random() * 5); // 0-4 arası kaçış
-        const completed = Math.random() > 0.3; // %70 tamamlanma oranı
+        const duration = Math.floor(Math.random() * 3600) + 900; // 15-75 minutes (in seconds)
+        const distractions = Math.floor(Math.random() * 5); // 0-4 distractions
+        const completed = Math.random() > 0.25; // 75% completion rate
         
-        // Günün farklı saatlerine dağıt
-        const hour = Math.floor(Math.random() * 12) + 8; // 08:00 - 20:00 arası
+        // Distribute across 7 AM - 9 PM
+        const hour = Math.floor(Math.random() * 14) + 7;
         date.setHours(hour, Math.floor(Math.random() * 60), 0, 0);
 
         await this.addSession({
@@ -169,9 +183,10 @@ class DatabaseService {
       }
     }
     
-    console.log('✅ Fake data başarıyla eklendi!');
+    console.log('✅ 30 days of test data added');
   }
 
+  /** Clears all session data from the database */
   async clearAllData(): Promise<void> {
     if (Platform.OS === 'web') {
       console.log('Mock: All data cleared');
@@ -182,7 +197,263 @@ class DatabaseService {
     if (!this.db) return;
 
     await this.db.runAsync('DELETE FROM sessions');
-    console.log('🗑️ Tüm veriler silindi!');
+    console.log('🗑️ All data cleared');
+  }
+
+  /** Retrieves sessions for a specific date */
+  async getSessionsByDate(date: string): Promise<FocusSession[]> {
+    if (Platform.OS === 'web') {
+      return [];
+    }
+    
+    if (!this.db) await this.init();
+    if (!this.db) return [];
+
+    const result = await this.db.getAllAsync<FocusSession>(
+      'SELECT * FROM sessions WHERE date LIKE ? ORDER BY date DESC',
+      `${date}%`
+    );
+
+    return result;
+  }
+
+  /** 
+   * Calculates current and longest focus streaks from session data
+   * A streak is maintained by achieving the 2-hour daily goal
+   * @returns Object with current streak and longest streak in days
+   */
+  async getCurrentStreak(): Promise<{ current: number; longest: number }> {
+    if (Platform.OS === 'web') {
+      return { current: 0, longest: 0 };
+    }
+    
+    if (!this.db) await this.init();
+    if (!this.db) return { current: 0, longest: 0 };
+
+    const allSessions = await this.getAllSessions();
+    
+    // Group sessions by date and calculate daily totals
+    const dayMap = new Map<string, number>();
+    allSessions.forEach(session => {
+      const date = session.date.split('T')[0];
+      dayMap.set(date, (dayMap.get(date) || 0) + session.duration);
+    });
+
+    const sortedDates = Array.from(dayMap.keys()).sort().reverse();
+    
+    if (sortedDates.length === 0) {
+      return { current: 0, longest: 0 };
+    }
+
+    // Daily goal: 2 hours (7200 seconds)
+    const dailyGoal = 2 * 60 * 60;
+
+    let currentStreak = 0;
+    let longestStreak = 0;
+    let tempStreak = 0;
+
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    // Calculate current streak (check back 1 year maximum)
+    let checkDate = new Date();
+    let foundToday = false;
+
+    for (let i = 0; i < 365; i++) {
+      const dateStr = checkDate.toISOString().split('T')[0];
+      const duration = dayMap.get(dateStr) || 0;
+
+      if (duration >= dailyGoal) {
+        currentStreak++;
+        if (dateStr === today) foundToday = true;
+      } else {
+        // Break streak if not today or yesterday
+        if (dateStr !== today && dateStr !== yesterdayStr) {
+          break;
+        }
+        if (dateStr === today && !foundToday) {
+          // Continue checking
+        } else {
+          break;
+        }
+      }
+
+      checkDate.setDate(checkDate.getDate() - 1);
+    }
+
+    // Calculate longest streak from history
+    let currentDate = '';
+    for (const date of sortedDates) {
+      const duration = dayMap.get(date) || 0;
+      
+      if (duration >= dailyGoal) {
+        if (currentDate === '') {
+          tempStreak = 1;
+        } else {
+          const prevDate = new Date(currentDate);
+          const currDate = new Date(date);
+          const diffTime = Math.abs(prevDate.getTime() - currDate.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          
+          if (diffDays === 1) {
+            tempStreak++;
+          } else {
+            longestStreak = Math.max(longestStreak, tempStreak);
+            tempStreak = 1;
+          }
+        }
+        currentDate = date;
+      } else {
+        longestStreak = Math.max(longestStreak, tempStreak);
+        tempStreak = 0;
+        currentDate = '';
+      }
+    }
+    longestStreak = Math.max(longestStreak, tempStreak);
+
+    return { current: currentStreak, longest: longestStreak };
+  }
+
+  /** 
+   * Unlocks an achievement by ID
+   * @param achievementId Unique identifier for the achievement
+   */
+  async unlockAchievement(achievementId: string): Promise<void> {
+    if (Platform.OS === 'web') {
+      console.log('Mock: Achievement unlocked', achievementId);
+      return;
+    }
+    
+    if (!this.db) await this.init();
+    if (!this.db) return;
+
+    try {
+      await this.db.runAsync(
+        'INSERT OR IGNORE INTO achievements (id, unlockedAt) VALUES (?, ?)',
+        achievementId,
+        new Date().toISOString()
+      );
+    } catch (error) {
+      console.error('Achievement unlock error:', error);
+    }
+  }
+
+  /** Retrieves list of all unlocked achievement IDs */
+  async getUnlockedAchievements(): Promise<string[]> {
+    if (Platform.OS === 'web') {
+      return [];
+    }
+    
+    if (!this.db) await this.init();
+    if (!this.db) return [];
+
+    const result = await this.db.getAllAsync<{ id: string }>(
+      'SELECT id FROM achievements'
+    );
+
+    return result.map(r => r.id);
+  }
+
+  /** 
+   * Evaluates all achievement conditions and unlocks new achievements
+   * Categories: time-based, session-count, streaks, focus quality, special behaviors
+   * @returns Array of newly unlocked achievement IDs
+   */
+  async checkAndUnlockAchievements(): Promise<string[]> {
+    if (Platform.OS === 'web') {
+      return [];
+    }
+    
+    const allSessions = await this.getAllSessions();
+    const unlockedIds = await this.getUnlockedAchievements();
+    const newlyUnlocked: string[] = [];
+
+    // Time-based achievements
+    const totalTime = allSessions.reduce((sum, s) => sum + s.duration, 0);
+    const timeAchievements = [
+      { id: 'first_hour', req: 3600 },
+      { id: 'five_hours', req: 18000 },
+      { id: 'ten_hours', req: 36000 },
+      { id: 'twenty_hours', req: 72000 },
+      { id: 'fifty_hours', req: 180000 },
+      { id: 'hundred_hours', req: 360000 },
+    ];
+
+    for (const ach of timeAchievements) {
+      if (!unlockedIds.includes(ach.id) && totalTime >= ach.req) {
+        await this.unlockAchievement(ach.id);
+        newlyUnlocked.push(ach.id);
+      }
+    }
+
+    // Session count achievements
+    const completedSessions = allSessions.filter(s => s.completed).length;
+    const sessionAchievements = [
+      { id: 'first_session', req: 1 },
+      { id: 'ten_sessions', req: 10 },
+      { id: 'fifty_sessions', req: 50 },
+      { id: 'hundred_sessions', req: 100 },
+    ];
+
+    for (const ach of sessionAchievements) {
+      if (!unlockedIds.includes(ach.id) && completedSessions >= ach.req) {
+        await this.unlockAchievement(ach.id);
+        newlyUnlocked.push(ach.id);
+      }
+    }
+
+    // Streak achievements
+    const streak = await this.getCurrentStreak();
+    const streakAchievements = [
+      { id: 'three_day_streak', req: 3 },
+      { id: 'week_streak', req: 7 },
+      { id: 'two_week_streak', req: 14 },
+      { id: 'month_streak', req: 30 },
+    ];
+
+    for (const ach of streakAchievements) {
+      if (!unlockedIds.includes(ach.id) && streak.current >= ach.req) {
+        await this.unlockAchievement(ach.id);
+        newlyUnlocked.push(ach.id);
+      }
+    }
+
+    // Focus quality achievement (no distractions)
+    if (!unlockedIds.includes('no_distraction')) {
+      const perfectSession = allSessions.find(s => s.completed && s.distractions === 0);
+      if (perfectSession) {
+        await this.unlockAchievement('no_distraction');
+        newlyUnlocked.push('no_distraction');
+      }
+    }
+
+    // Early morning achievement
+    if (!unlockedIds.includes('early_bird')) {
+      const earlySession = allSessions.find(s => {
+        const hour = new Date(s.date).getHours();
+        return hour < 7;
+      });
+      if (earlySession) {
+        await this.unlockAchievement('early_bird');
+        newlyUnlocked.push('early_bird');
+      }
+    }
+
+    // Late night achievement
+    if (!unlockedIds.includes('night_owl')) {
+      const nightSession = allSessions.find(s => {
+        const hour = new Date(s.date).getHours();
+        return hour >= 22;
+      });
+      if (nightSession) {
+        await this.unlockAchievement('night_owl');
+        newlyUnlocked.push('night_owl');
+      }
+    }
+
+    return newlyUnlocked;
   }
 }
 
