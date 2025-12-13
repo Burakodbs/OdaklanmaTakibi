@@ -7,9 +7,6 @@ export type ThemedViewProps = ViewProps & {
   darkColor?: string;
 };
 
-/**
- * Themed view component that automatically applies background color based on color scheme
- */
 export function ThemedView({ style, lightColor, darkColor, ...otherProps }: ThemedViewProps) {
   const backgroundColor = useThemeColor({ light: lightColor, dark: darkColor }, 'background');
 

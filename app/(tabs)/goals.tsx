@@ -23,7 +23,7 @@ export default function GoalsScreen() {
     const colors = Colors[colorScheme ?? 'light'];
     const insets = useSafeAreaInsets();
 
-    const [dailyGoal, setDailyGoal] = useState(2 * 60 * 60); // 2 saat default
+    const [dailyGoal, setDailyGoal] = useState(2 * 60 * 60);
     const [todayDuration, setTodayDuration] = useState(0);
     const [currentStreak, setCurrentStreak] = useState(0);
     const [longestStreak, setLongestStreak] = useState(0);
@@ -36,19 +36,16 @@ export default function GoalsScreen() {
     const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
     const [showAchievementsModal, setShowAchievementsModal] = useState(false);
 
-    /** Loads all goal and achievement related data */
     const loadData = useCallback(async () => {
         try {
             const todaySessions = await database.getTodaySessions();
             const todayTotal = todaySessions.reduce((sum, s) => sum + s.duration, 0);
             setTodayDuration(todayTotal);
 
-            // Calculate current and longest streaks
             const streak = await database.getCurrentStreak();
             setCurrentStreak(streak.current);
             setLongestStreak(streak.longest);
 
-            // Get last 7 days progress
             const last7Days = Array.from({ length: 7 }, (_, i) => {
                 const date = new Date();
                 date.setDate(date.getDate() - (6 - i));
@@ -90,7 +87,6 @@ export default function GoalsScreen() {
         setRefreshing(false);
     }, [loadData]);
 
-    /** Updates daily goal value (in seconds) */
     const handleSaveGoal = () => {
         const hours = parseFloat(goalInput);
         if (isNaN(hours) || hours <= 0 || hours > 24) {
@@ -121,7 +117,6 @@ export default function GoalsScreen() {
             >
                 <ThemedText type="title" style={styles.title}>Hedefler & İlerleme</ThemedText>
 
-                {/* Günlük Hedef Kartı */}
                 <View style={[styles.goalCard, { backgroundColor: colors.card }]}>
                     <View style={styles.goalHeader}>
                         <View style={styles.goalHeaderLeft}>
@@ -177,7 +172,6 @@ export default function GoalsScreen() {
                     )}
                 </View>
 
-                {/* Streak Kartı */}
                 <View style={[styles.streakCard, { backgroundColor: colors.card }]}>
                     <View style={styles.streakHeader}>
                         <MaterialCommunityIcons name="fire" size={32} color="#FF6B35" />
@@ -216,7 +210,6 @@ export default function GoalsScreen() {
                     </View>
                 </View>
 
-                {/* Haftalık İlerleme */}
                 <View style={[styles.weeklyCard, { backgroundColor: colors.card }]}>
                     <ThemedText style={[styles.weeklyTitle, { color: colors.text }]}>
                         Son 7 Gün
@@ -224,7 +217,6 @@ export default function GoalsScreen() {
                     <View style={styles.weeklyBarsContainer}>
                         {weeklyProgress.map((duration, index) => {
                             const dayNames = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
-                            // Haftalık ilerleme için last7Days dizisini kullan
                             const last7Days = Array.from({ length: 7 }, (_, i) => {
                                 const date = new Date();
                                 date.setDate(date.getDate() - (6 - i));
@@ -272,7 +264,6 @@ export default function GoalsScreen() {
                     </View>
                 </View>
 
-                {/* İstatistikler */}
                 <View style={styles.statsGrid}>
                     <View style={[styles.statBox, { backgroundColor: colors.card }]}>
                         <MaterialCommunityIcons name="clock-check" size={24} color={colors.primary} />
@@ -295,7 +286,6 @@ export default function GoalsScreen() {
                     </View>
                 </View>
 
-                {/* Rozetler */}
                 <TouchableOpacity 
                     style={[styles.achievementsCard, { backgroundColor: colors.card }]}
                     onPress={() => setShowAchievementsModal(true)}
@@ -341,7 +331,6 @@ export default function GoalsScreen() {
                 </TouchableOpacity>
             </ScrollView>
 
-            {/* Hedef Ayarlama Modal */}
             <Modal visible={showGoalModal} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
@@ -408,7 +397,6 @@ export default function GoalsScreen() {
                 </View>
             </Modal>
             
-            {/* Achievements Modal */}
             <Modal visible={showAchievementsModal} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
                     <View style={[styles.achievementsModalContent, { backgroundColor: colors.card }]}>

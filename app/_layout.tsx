@@ -16,7 +16,6 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
     useEffect(() => {
-        // Only initialize database on native platforms
         if (Platform.OS !== 'web') {
             database.init();
         }

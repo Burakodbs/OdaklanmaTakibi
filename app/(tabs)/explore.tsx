@@ -42,7 +42,7 @@ export default function ReportsScreen() {
         const durations = last7Days.map(day => {
             const daySessions = sessions.filter(s => s.date.startsWith(day));
             const minutes = Math.round(daySessions.reduce((sum, s) => sum + s.duration, 0) / 60);
-            return minutes > 0 ? minutes : 0; // return actual minutes or 0
+            return minutes > 0 ? minutes : 0;
         });
 
         setWeeklyData({labels: dayLabels, datasets: [{data: durations}]});

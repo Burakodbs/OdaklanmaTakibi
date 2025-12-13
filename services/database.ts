@@ -10,18 +10,12 @@ export interface FocusSession {
   completed: boolean;
 }
 
-/**
- * DatabaseService - Manages all focus session data and achievements
- * Uses expo-sqlite for native platforms, mock data for web
- */
 class DatabaseService {
   private db: SQLiteType.SQLiteDatabase | null = null;
   private initialized = false;
   private initializing = false;
 
-  /** Initializes database connection (skips on web platform) */
   async init() {
-    // Web doesn't support SQLite
     if (Platform.OS === 'web') {
       console.warn('SQLite not available on web. Using mock data.');
       this.initialized = true;
@@ -46,7 +40,6 @@ class DatabaseService {
     }
   }
 
-  /** Creates required database tables */
   private async createTables() {
     if (!this.db) return;
 
@@ -67,7 +60,6 @@ class DatabaseService {
     `);
   }
 
-  /** Adds a new focus session to database */
   async addSession(session: FocusSession): Promise<void> {
     if (Platform.OS === 'web') {
       console.log('Mock: Session added', session);
@@ -87,7 +79,6 @@ class DatabaseService {
     );
   }
 
-  /** Retrieves all focus sessions */
   async getAllSessions(): Promise<FocusSession[]> {
     if (Platform.OS === 'web') {
       return [];
@@ -103,7 +94,6 @@ class DatabaseService {
     return result;
   }
 
-  /** Retrieves today's focus sessions */
   async getTodaySessions(): Promise<FocusSession[]> {
     if (Platform.OS === 'web') {
       return [];
@@ -121,7 +111,6 @@ class DatabaseService {
     return result;
   }
 
-  /** Retrieves sessions from past N days */
   async getSessionsByDateRange(days: number): Promise<FocusSession[]> {
     if (Platform.OS === 'web') {
       return [];
@@ -142,7 +131,6 @@ class DatabaseService {
     return result;
   }
 
-  /** Generates 30 days of mock data for testing and development */
   async addFakeData(): Promise<void> {
     if (Platform.OS === 'web') {
       console.log('Mock: Fake data added');
@@ -155,21 +143,18 @@ class DatabaseService {
     const categories = ['Ders Çalışma', 'Kodlama', 'Proje', 'Kitap Okuma', 'Diğer'];
     const now = new Date();
 
-    // Generates 30 days of test sessions
     for (let i = 0; i < 30; i++) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
       
-      // 2-5 sessions per day
       const sessionsCount = Math.floor(Math.random() * 4) + 2;
       
       for (let j = 0; j < sessionsCount; j++) {
         const category = categories[Math.floor(Math.random() * categories.length)];
-        const duration = Math.floor(Math.random() * 3600) + 900; // 15-75 minutes (in seconds)
-        const distractions = Math.floor(Math.random() * 5); // 0-4 distractions
-        const completed = Math.random() > 0.25; // 75% completion rate
+        const duration = Math.floor(Math.random() * 3600) + 900;
+        const distractions = Math.floor(Math.random() * 5);
+        const completed = Math.random() > 0.25;
         
-        // Distribute across 7 AM - 9 PM
         const hour = Math.floor(Math.random() * 14) + 7;
         date.setHours(hour, Math.floor(Math.random() * 60), 0, 0);
 
@@ -186,7 +171,6 @@ class DatabaseService {
     console.log('✅ 30 days of test data added');
   }
 
-  /** Clears all session data from the database */
   async clearAllData(): Promise<void> {
     if (Platform.OS === 'web') {
       console.log('Mock: All data cleared');
@@ -200,7 +184,6 @@ class DatabaseService {
     console.log('🗑️ All data cleared');
   }
 
-  /** Retrieves sessions for a specific date */
   async getSessionsByDate(date: string): Promise<FocusSession[]> {
     if (Platform.OS === 'web') {
       return [];
@@ -217,11 +200,6 @@ class DatabaseService {
     return result;
   }
 
-  /** 
-   * Calculates current and longest focus streaks from session data
-   * A streak is maintained by achieving the 2-hour daily goal
-   * @returns Object with current streak and longest streak in days
-   */
   async getCurrentStreak(): Promise<{ current: number; longest: number }> {
     if (Platform.OS === 'web') {
       return { current: 0, longest: 0 };
@@ -232,7 +210,6 @@ class DatabaseService {
 
     const allSessions = await this.getAllSessions();
     
-    // Group sessions by date and calculate daily totals
     const dayMap = new Map<string, number>();
     allSessions.forEach(session => {
       const date = session.date.split('T')[0];
@@ -245,7 +222,6 @@ class DatabaseService {
       return { current: 0, longest: 0 };
     }
 
-    // Daily goal: 2 hours (7200 seconds)
     const dailyGoal = 2 * 60 * 60;
 
     let currentStreak = 0;
@@ -257,7 +233,6 @@ class DatabaseService {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split('T')[0];
 
-    // Calculate current streak (check back 1 year maximum)
     let checkDate = new Date();
     let foundToday = false;
 
@@ -269,12 +244,10 @@ class DatabaseService {
         currentStreak++;
         if (dateStr === today) foundToday = true;
       } else {
-        // Break streak if not today or yesterday
         if (dateStr !== today && dateStr !== yesterdayStr) {
           break;
         }
         if (dateStr === today && !foundToday) {
-          // Continue checking
         } else {
           break;
         }
@@ -283,7 +256,6 @@ class DatabaseService {
       checkDate.setDate(checkDate.getDate() - 1);
     }
 
-    // Calculate longest streak from history
     let currentDate = '';
     for (const date of sortedDates) {
       const duration = dayMap.get(date) || 0;
@@ -316,10 +288,6 @@ class DatabaseService {
     return { current: currentStreak, longest: longestStreak };
   }
 
-  /** 
-   * Unlocks an achievement by ID
-   * @param achievementId Unique identifier for the achievement
-   */
   async unlockAchievement(achievementId: string): Promise<void> {
     if (Platform.OS === 'web') {
       console.log('Mock: Achievement unlocked', achievementId);
@@ -340,7 +308,6 @@ class DatabaseService {
     }
   }
 
-  /** Retrieves list of all unlocked achievement IDs */
   async getUnlockedAchievements(): Promise<string[]> {
     if (Platform.OS === 'web') {
       return [];
@@ -356,11 +323,6 @@ class DatabaseService {
     return result.map(r => r.id);
   }
 
-  /** 
-   * Evaluates all achievement conditions and unlocks new achievements
-   * Categories: time-based, session-count, streaks, focus quality, special behaviors
-   * @returns Array of newly unlocked achievement IDs
-   */
   async checkAndUnlockAchievements(): Promise<string[]> {
     if (Platform.OS === 'web') {
       return [];
@@ -370,7 +332,6 @@ class DatabaseService {
     const unlockedIds = await this.getUnlockedAchievements();
     const newlyUnlocked: string[] = [];
 
-    // Time-based achievements
     const totalTime = allSessions.reduce((sum, s) => sum + s.duration, 0);
     const timeAchievements = [
       { id: 'first_hour', req: 3600 },
@@ -388,7 +349,6 @@ class DatabaseService {
       }
     }
 
-    // Session count achievements
     const completedSessions = allSessions.filter(s => s.completed).length;
     const sessionAchievements = [
       { id: 'first_session', req: 1 },
@@ -404,7 +364,6 @@ class DatabaseService {
       }
     }
 
-    // Streak achievements
     const streak = await this.getCurrentStreak();
     const streakAchievements = [
       { id: 'three_day_streak', req: 3 },
@@ -420,7 +379,6 @@ class DatabaseService {
       }
     }
 
-    // Focus quality achievement (no distractions)
     if (!unlockedIds.includes('no_distraction')) {
       const perfectSession = allSessions.find(s => s.completed && s.distractions === 0);
       if (perfectSession) {
@@ -429,7 +387,6 @@ class DatabaseService {
       }
     }
 
-    // Early morning achievement
     if (!unlockedIds.includes('early_bird')) {
       const earlySession = allSessions.find(s => {
         const hour = new Date(s.date).getHours();
@@ -441,7 +398,6 @@ class DatabaseService {
       }
     }
 
-    // Late night achievement
     if (!unlockedIds.includes('night_owl')) {
       const nightSession = allSessions.find(s => {
         const hour = new Date(s.date).getHours();

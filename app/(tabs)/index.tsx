@@ -39,39 +39,25 @@ export default function TimerScreen() {
     const isRunningRef = useRef(isRunning);
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
-    useEffect(() => {
-        isRunningRef.current = isRunning;
-        if (isRunning) startPulse();
-        else stopPulse();
-    }, [isRunning]);
-
-    const startPulse = () => {
+    const startPulse = useCallback(() => {
         Animated.loop(
             Animated.sequence([
                 Animated.timing(pulseAnim, {toValue: 1.02, duration: 1200, useNativeDriver: true}),
                 Animated.timing(pulseAnim, {toValue: 1, duration: 1200, useNativeDriver: true}),
             ])
         ).start();
-    };
+    }, [pulseAnim]);
 
-    const stopPulse = () => {
+    const stopPulse = useCallback(() => {
         pulseAnim.stopAnimation();
         pulseAnim.setValue(1);
-    };
+    }, [pulseAnim]);
 
     useEffect(() => {
-        const subscription = AppState.addEventListener('change', nextAppState => {
-            if (appStateRef.current === 'active' && nextAppState.match(/inactive|background/)) {
-                if (isRunningRef.current) {
-                    setDistractions(prev => prev + 1);
-                    handlePause();
-                    Alert.alert('Dikkat Dağınıklığı', 'Uygulamadan ayrıldınız. Sayaç duraklatıldı.', [{text: 'Tamam'}]);
-                }
-            }
-            appStateRef.current = nextAppState;
-        });
-        return () => subscription.remove();
-    }, []);
+        isRunningRef.current = isRunning;
+        if (isRunning) startPulse();
+        else stopPulse();
+    }, [isRunning, startPulse, stopPulse]);
 
     const saveSession = useCallback(async (duration: number, completed: boolean) => {
         try {
@@ -109,6 +95,20 @@ export default function TimerScreen() {
         }
     }, []);
 
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', nextAppState => {
+            if (appStateRef.current === 'active' && nextAppState.match(/inactive|background/)) {
+                if (isRunningRef.current) {
+                    setDistractions(prev => prev + 1);
+                    handlePause();
+                    Alert.alert('Dikkat Dağınıklığı', 'Uygulamadan ayrıldınız. Sayaç duraklatıldı.', [{text: 'Tamam'}]);
+                }
+            }
+            appStateRef.current = nextAppState;
+        });
+        return () => subscription.remove();
+    }, [handlePause]);
+
     const handleReset = useCallback(() => {
         handlePause();
         setTimeLeft(DEFAULT_DURATION);
@@ -117,7 +117,7 @@ export default function TimerScreen() {
     }, [handlePause]);
 
     const handleStop = useCallback(() => {
-        if (!isRunning && timeLeft === DEFAULT_DURATION) return; // nothing to stop
+        if (!isRunning && timeLeft === DEFAULT_DURATION) return;
         handlePause();
         const duration = DEFAULT_DURATION - timeLeft;
         setSessionDuration(duration);
