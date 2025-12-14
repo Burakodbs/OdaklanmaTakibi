@@ -102,7 +102,7 @@ export default function GoalsScreen() {
     const isGoalCompleted = todayDuration >= dailyGoal;
 
     return (
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top', 'bottom']}> 
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}> 
             <ScrollView
                 contentContainerStyle={[styles.container, { paddingBottom: 80 + insets.bottom }]}
                 showsVerticalScrollIndicator={false}

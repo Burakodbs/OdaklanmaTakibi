@@ -161,7 +161,7 @@ export default function ReportsScreen() {
     const hasData = weeklyData.datasets[0].data.some(v => v > 0) || categoryData.length > 0;
 
   return (
-      <SafeAreaView style={[styles.safeArea, {backgroundColor: colors.background}]}>
+      <SafeAreaView style={[styles.safeArea, {backgroundColor: colors.background}]} edges={['top']}>
           <ScrollView
               contentContainerStyle={styles.container}
               showsVerticalScrollIndicator={false}

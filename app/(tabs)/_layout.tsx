@@ -1,10 +1,10 @@
-import {Tabs} from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
 import React from 'react';
-import {MaterialCommunityIcons} from '@expo/vector-icons';
 
-import {HapticTab} from '@/components/haptic-tab';
-import {Colors} from '@/constants/theme';
-import {useColorScheme} from '@/hooks/use-color-scheme';
+import { HapticTab } from '@/components/haptic-tab';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -20,11 +20,8 @@ export default function TabLayout() {
           tabBarStyle: {
               backgroundColor: colors.card,
               borderTopWidth: 0,
-              elevation: 8,
-              shadowColor: '#000',
-              shadowOffset: {width: 0, height: -2},
-              shadowOpacity: 0.05,
-              shadowRadius: 4,
+              elevation: 0,
+              shadowColor: 'transparent',
               height: 60,
               paddingBottom: 5,
           },

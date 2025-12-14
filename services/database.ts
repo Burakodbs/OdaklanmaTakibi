@@ -181,6 +181,7 @@ class DatabaseService {
     if (!this.db) return;
 
     await this.db.runAsync('DELETE FROM sessions');
+    await this.db.runAsync('DELETE FROM achievements');
     console.log('🗑️ All data cleared');
   }
 

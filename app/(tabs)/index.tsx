@@ -132,7 +132,7 @@ export default function TimerScreen() {
     }, [handleReset]);
 
   return (
-      <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]}>
+      <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]} edges={['top']}>
           <ScrollView contentContainerStyle={styles.content}>
               <ThemedText type="title" style={styles.title}>Odaklanma Zamanı</ThemedText>
 
