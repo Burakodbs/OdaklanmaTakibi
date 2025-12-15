@@ -104,7 +104,6 @@ export default function TimerScreen() {
                     handlePause();
                 }
             } else if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
-                // Kullanıcı uygulamaya geri döndü
                 if (timeLeft > 0 && timeLeft < selectedDuration && !isRunning) {
                     Alert.alert(
                         'Hoş Geldin!',
@@ -265,19 +264,19 @@ export default function TimerScreen() {
                       <TouchableOpacity style={[styles.button, {backgroundColor: colors.primary}]} onPress={handleStart}
                                         activeOpacity={0.7}>
                           <MaterialCommunityIcons name="play" size={24} color="#ffffff"/>
-                          <ThemedText style={styles.buttonText}>Başlat</ThemedText>
+                          <ThemedText style={[styles.buttonText, {marginLeft: 8}]}>Başlat</ThemedText>
                       </TouchableOpacity>
                   ) : (
                       <TouchableOpacity style={[styles.button, {backgroundColor: colors.accent}]} onPress={handlePause}
                                         activeOpacity={0.7}>
                           <MaterialCommunityIcons name="pause" size={24} color="#ffffff"/>
-                          <ThemedText style={styles.buttonText}>Duraklat</ThemedText>
+                          <ThemedText style={[styles.buttonText, {marginLeft: 8}]}>Duraklat</ThemedText>
                       </TouchableOpacity>
                   )}
                   <TouchableOpacity style={[styles.button, styles.stopButton]} onPress={handleStop}
                                     disabled={!isRunning && timeLeft === selectedDuration} activeOpacity={0.7}>
                       <MaterialCommunityIcons name="stop" size={24} color="#ffffff"/>
-                      <ThemedText style={styles.buttonText}>Bitir</ThemedText>
+                      <ThemedText style={[styles.buttonText, {marginLeft: 8}]}>Bitir</ThemedText>
                   </TouchableOpacity>
               </View>
 
@@ -418,13 +417,13 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 12,
         borderRadius: 8,
-        gap: 4,
         minWidth: 60,
     },
     adjustButtonText: {
         color: '#ffffff',
         fontSize: 12,
         fontWeight: 'bold',
+        marginLeft: 4,
     },
     pickerWrapper: {
         flex: 1,
@@ -436,14 +435,13 @@ const styles = StyleSheet.create({
     },
     buttonsContainer: {
         flexDirection: 'row',
-        justifyContent: 'center',
-        gap: 15,
+        justifyContent: 'space-between',
         marginVertical: 12,
+        paddingHorizontal: 10,
     },
     button: {
-        flex: 1,
+        width: '48%',
         flexDirection: 'row',
-        maxWidth: 150,
         paddingVertical: 14,
         borderRadius: 12,
         alignItems: 'center',
@@ -453,7 +451,6 @@ const styles = StyleSheet.create({
         shadowOffset: {width: 0, height: 2},
         shadowOpacity: 0.1,
         shadowRadius: 4,
-        gap: 8,
     },
     stopButton: {
         backgroundColor: '#d9534f',
@@ -493,13 +490,13 @@ const styles = StyleSheet.create({
         paddingVertical: 20,
         paddingHorizontal: 16,
         alignItems: 'center',
-        gap: 8,
     },
     modalTitle: {
         fontSize: 20,
         fontWeight: 'bold',
         color: '#ffffff',
         textAlign: 'center',
+        marginTop: 8,
     },
     modalSubtitle: {
         fontSize: 13,
@@ -507,20 +504,21 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         opacity: 0.95,
         paddingHorizontal: 10,
+        marginTop: 8,
     },
     modalBody: {
         padding: 16,
-        gap: 10,
     },
     summaryCard: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: 12,
         borderRadius: 10,
-        gap: 10,
+        marginBottom: 10,
     },
     summaryCardContent: {
         flex: 1,
+        marginLeft: 10,
     },
     summaryLabel: {
         fontSize: 12,

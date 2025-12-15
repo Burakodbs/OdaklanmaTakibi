@@ -29,8 +29,13 @@ export default function ReportsScreen() {
     }[]>([]);
     const [monthlyCalendar, setMonthlyCalendar] = useState<{date: string; hasSessions: boolean; duration: number}[]>([]);
     const [selectedMonth, setSelectedMonth] = useState(new Date());
-    const [dailyGoal, setDailyGoal] = useState(2 * 60 * 60); // 2 saat default
+    const [dailyGoal, setDailyGoal] = useState(2 * 60 * 60);
     const [refreshing, setRefreshing] = useState(false);
+    const [longestSession, setLongestSession] = useState(0);
+    const [bestDay, setBestDay] = useState({ date: '', duration: 0 });
+    const [bestWeek, setBestWeek] = useState(0);
+    const [totalSessions, setTotalSessions] = useState(0);
+    const [perfectSessions, setPerfectSessions] = useState(0);
 
     const processWeeklyData = useCallback((sessions: FocusSession[]) => {
         const dayLabels: string[] = [];
@@ -52,7 +57,6 @@ export default function ReportsScreen() {
     }, []);
 
     const processCategoryData = useCallback((sessions: FocusSession[]) => {
-        // Yüksek kontrastlı, birbirinden farklı renkler
         const categoryColors = ['#FF3B30', '#34C759', '#007AFF', '#FF9500', '#AF52DE', '#FF2D55'];
         const categoryMap = new Map<string, number>();
 
@@ -76,7 +80,7 @@ export default function ReportsScreen() {
             });
 
         setCategoryData(data);
-    }, [colors.primary, colors.secondary, colorScheme]);
+    }, [colorScheme]);
 
     const processMonthlyCalendar = useCallback((sessions: FocusSession[], month: Date) => {
         const year = month.getFullYear();
@@ -101,6 +105,51 @@ export default function ReportsScreen() {
         setMonthlyCalendar(calendar);
     }, []);
 
+    const processRecords = useCallback((sessions: FocusSession[]) => {
+        if (sessions.length === 0) {
+            setLongestSession(0);
+            setBestDay({ date: '', duration: 0 });
+            setBestWeek(0);
+            setTotalSessions(0);
+            setPerfectSessions(0);
+            return;
+        }
+        const longest = Math.max(...sessions.map(s => s.duration));
+        setLongestSession(longest);
+        setTotalSessions(sessions.length);
+
+        const perfect = sessions.filter(s => s.distractions === 0).length;
+        setPerfectSessions(perfect);
+
+        const dailyMap = new Map<string, number>();
+        sessions.forEach(s => {
+            const date = s.date.split('T')[0];
+            dailyMap.set(date, (dailyMap.get(date) || 0) + s.duration);
+        });
+
+        let maxDay = { date: '', duration: 0 };
+        dailyMap.forEach((duration, date) => {
+            if (duration > maxDay.duration) {
+                maxDay = { date, duration };
+            }
+        });
+        setBestDay(maxDay);
+
+        const last30Days = Array.from({ length: 30 }, (_, i) => {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            return date.toISOString().split('T')[0];
+        }).reverse();
+
+        let maxWeekDuration = 0;
+        for (let i = 0; i <= last30Days.length - 7; i++) {
+            const weekDays = last30Days.slice(i, i + 7);
+            const weekDuration = weekDays.reduce((sum, day) => sum + (dailyMap.get(day) || 0), 0);
+            maxWeekDuration = Math.max(maxWeekDuration, weekDuration);
+        }
+        setBestWeek(maxWeekDuration);
+    }, []);
+
     const loadData = useCallback(async () => {
         try {
             const todaySessions = await database.getTodaySessions();
@@ -118,10 +167,11 @@ export default function ReportsScreen() {
             processWeeklyData(weeklySessions);
             processCategoryData(allSessions);
             processMonthlyCalendar(allSessions, selectedMonth);
+            processRecords(allSessions);
         } catch (error) {
             console.error('Veri yüklenemedi:', error);
         }
-    }, [processWeeklyData, processCategoryData, processMonthlyCalendar, selectedMonth]);
+    }, [processWeeklyData, processCategoryData, processMonthlyCalendar, processRecords, selectedMonth]);
 
     useFocusEffect(
         useCallback(() => {
@@ -129,10 +179,9 @@ export default function ReportsScreen() {
         }, [loadData])
     );
 
-    // Ay değiştiğinde takvimi güncelle
     React.useEffect(() => {
         loadData();
-    }, [selectedMonth]);
+    }, [loadData, selectedMonth]);
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
@@ -287,6 +336,74 @@ export default function ReportsScreen() {
                           </View>
                       )}
 
+                      {/* Liderlik Tablosu / Rekorlar */}
+                      <View style={[styles.chartWrapper, {backgroundColor: colors.card}]}>
+                          <View style={styles.recordsHeader}>
+                              <MaterialCommunityIcons name="trophy" size={24} color="#FFD700" />
+                              <ThemedText style={[styles.chartTitle, {color: colors.text, marginLeft: 8}]}>
+                                  Rekorlar
+                              </ThemedText>
+                          </View>
+                          
+                          <View style={styles.recordsGrid}>
+                              <View style={[styles.recordCard, {backgroundColor: colors.background}]}>
+                                  <MaterialCommunityIcons name="timer" size={32} color="#FF3B30" />
+                                  <ThemedText style={[styles.recordLabel, {color: colors.text}]}>En Uzun Seans</ThemedText>
+                                  <ThemedText style={[styles.recordValue, {color: colors.primary}]}>
+                                      {formatDuration(longestSession)}
+                                  </ThemedText>
+                              </View>
+
+                              <View style={[styles.recordCard, {backgroundColor: colors.background}]}>
+                                  <MaterialCommunityIcons name="calendar-star" size={32} color="#34C759" />
+                                  <ThemedText style={[styles.recordLabel, {color: colors.text}]}>En İyi Gün</ThemedText>
+                                  <ThemedText style={[styles.recordValue, {color: colors.primary}]}>
+                                      {bestDay.duration > 0 ? formatDuration(bestDay.duration) : '-'}
+                                  </ThemedText>
+                                  {bestDay.date && (
+                                      <ThemedText style={[styles.recordDate, {color: colors.text}]}>
+                                          {new Date(bestDay.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                                      </ThemedText>
+                                  )}
+                              </View>
+
+                              <View style={[styles.recordCard, {backgroundColor: colors.background}]}>
+                                  <MaterialCommunityIcons name="calendar-week" size={32} color="#007AFF" />
+                                  <ThemedText style={[styles.recordLabel, {color: colors.text}]}>En İyi Hafta</ThemedText>
+                                  <ThemedText style={[styles.recordValue, {color: colors.primary}]}>
+                                      {formatDuration(bestWeek)}
+                                  </ThemedText>
+                              </View>
+
+                              <View style={[styles.recordCard, {backgroundColor: colors.background}]}>
+                                  <MaterialCommunityIcons name="format-list-numbered" size={32} color="#FF9500" />
+                                  <ThemedText style={[styles.recordLabel, {color: colors.text}]}>Toplam Seans</ThemedText>
+                                  <ThemedText style={[styles.recordValue, {color: colors.primary}]}>
+                                      {totalSessions}
+                                  </ThemedText>
+                              </View>
+
+                              <View style={[styles.recordCard, {backgroundColor: colors.background}]}>
+                                  <MaterialCommunityIcons name="check-circle" size={32} color="#AF52DE" />
+                                  <ThemedText style={[styles.recordLabel, {color: colors.text}]}>Mükemmel Seans</ThemedText>
+                                  <ThemedText style={[styles.recordValue, {color: colors.primary}]}>
+                                      {perfectSessions}
+                                  </ThemedText>
+                                  <ThemedText style={[styles.recordSubtext, {color: colors.text}]}>
+                                      Kaçış: 0
+                                  </ThemedText>
+                              </View>
+
+                              <View style={[styles.recordCard, {backgroundColor: colors.background}]}>
+                                  <MaterialCommunityIcons name="percent" size={32} color="#FF2D55" />
+                                  <ThemedText style={[styles.recordLabel, {color: colors.text}]}>Başarı Oranı</ThemedText>
+                                  <ThemedText style={[styles.recordValue, {color: colors.primary}]}>
+                                      {totalSessions > 0 ? `%${Math.round((perfectSessions / totalSessions) * 100)}` : '%0'}
+                                  </ThemedText>
+                              </View>
+                          </View>
+                      </View>
+
                       {monthlyCalendar.length > 0 && (
                           <View style={[styles.chartWrapper, {backgroundColor: colors.card}]}>
                               <View style={styles.calendarHeader}>
@@ -331,34 +448,28 @@ export default function ReportsScreen() {
                                           
                                           const days = [];
                                           
-                                          // Boş hücreler ekle
                                           for (let i = 0; i < startDayOfWeek; i++) {
                                               days.push(<View key={`empty-${i}`} style={styles.dayCell} />);
                                           }
                                           
-                                          // Günleri ekle
                                           monthlyCalendar.forEach((dayData) => {
                                               const date = new Date(dayData.date);
                                               const dayNumber = date.getDate();
                                               const isToday = dayData.date === today.toISOString().split('T')[0];
                                               
-                                              // Hedefe göre renk hesapla
                                               let backgroundColor = 'transparent';
                                               if (dayData.hasSessions && dayData.duration > 0) {
                                                   const goalRatio = dayData.duration / dailyGoal;
                                                   
                                                   if (goalRatio >= 1) {
-                                                      // Hedef aşıldı - yeşil tonları
                                                       const intensity = Math.min((goalRatio - 1) * 0.5 + 0.5, 1);
-                                                      backgroundColor = `rgba(52, 199, 89, ${intensity})`; // #34C759
+                                                      backgroundColor = `rgba(52, 199, 89, ${intensity})`; 
                                                   } else if (goalRatio >= 0.5) {
-                                                      // Hedefe yakın - sarı-yeşil
                                                       const intensity = 0.3 + (goalRatio * 0.5);
-                                                      backgroundColor = `rgba(255, 204, 0, ${intensity})`; // #FFCC00
+                                                      backgroundColor = `rgba(255, 204, 0, ${intensity})`; 
                                                   } else {
-                                                      // Hedeften uzak - kırmızı tonları
                                                       const intensity = 0.3 + (goalRatio * 0.4);
-                                                      backgroundColor = `rgba(255, 59, 48, ${intensity})`; // #FF3B30
+                                                      backgroundColor = `rgba(255, 59, 48, ${intensity})`; 
                                                   }
                                               }
                                               
@@ -410,34 +521,33 @@ const styles = StyleSheet.create({
     },
     devButtonsContainer: {
         flexDirection: 'row',
-        gap: 10,
         marginBottom: 20,
         paddingHorizontal: 5,
+        justifyContent: 'space-between',
     },
     devButton: {
-        flex: 1,
+        width: '48%',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 10,
         paddingHorizontal: 12,
         borderRadius: 8,
-        gap: 6,
     },
     devButtonText: {
         color: '#ffffff',
         fontSize: 13,
         fontWeight: '600',
+        marginLeft: 6,
     },
     statsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: 10,
         marginBottom: 25,
+        justifyContent: 'space-between',
     },
     statCard: {
-        flex: 1,
-        minWidth: 100,
+        width: '31%',
         padding: 14,
         borderRadius: 12,
         alignItems: 'center',
@@ -447,17 +557,19 @@ const styles = StyleSheet.create({
         shadowOffset: {width: 0, height: 1},
         shadowOpacity: 0.05,
         shadowRadius: 2,
-        gap: 6,
+        marginBottom: 10,
   },
     statLabel: {
         fontSize: 12,
         fontWeight: '500',
         opacity: 0.7,
         textAlign: 'center',
+        marginTop: 6,
     },
     statValue: {
         fontSize: 18,
         fontWeight: 'bold',
+        marginTop: 6,
     },
     chartWrapper: {
         borderRadius: 16,
@@ -480,6 +592,57 @@ const styles = StyleSheet.create({
     },
     chart: {
         borderRadius: 12,
+    },
+    recordsHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        paddingHorizontal: 12,
+        marginBottom: 12,
+    },
+    recordsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        paddingHorizontal: 12,
+        width: '100%',
+        justifyContent: 'space-between',
+    },
+    recordCard: {
+        width: '48%',
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        marginBottom: 12,
+        elevation: 1,
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 1},
+        shadowOpacity: 0.03,
+        shadowRadius: 2,
+    },
+    recordLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        opacity: 0.7,
+        textAlign: 'center',
+        marginTop: 8,
+    },
+    recordValue: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginTop: 4,
+    },
+    recordDate: {
+        fontSize: 11,
+        opacity: 0.6,
+        textAlign: 'center',
+        marginTop: 2,
+    },
+    recordSubtext: {
+        fontSize: 10,
+        opacity: 0.5,
+        textAlign: 'center',
+        marginTop: 2,
     },
     emptyContainer: {
         alignItems: 'center',
