@@ -36,6 +36,7 @@ export default function ReportsScreen() {
     const [bestWeek, setBestWeek] = useState(0);
     const [totalSessions, setTotalSessions] = useState(0);
     const [perfectSessions, setPerfectSessions] = useState(0);
+    const [devToolsOpen, setDevToolsOpen] = useState(false);
 
     const processWeeklyData = useCallback((sessions: FocusSession[]) => {
         const dayLabels: string[] = [];
@@ -250,23 +251,6 @@ export default function ReportsScreen() {
                                               tintColor={colors.primary}/>}
           >
               <ThemedText type="title" style={styles.title}>Raporlar</ThemedText>
-
-              <View style={styles.devButtonsContainer}>
-                  <TouchableOpacity 
-                      style={[styles.devButton, {backgroundColor: colors.primary}]} 
-                      onPress={handleAddFakeData}
-                  >
-                      <MaterialCommunityIcons name="database-plus" size={18} color="#fff" />
-                      <ThemedText style={styles.devButtonText}>Test Verisi Ekle</ThemedText>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                      style={[styles.devButton, {backgroundColor: '#d9534f'}]} 
-                      onPress={handleClearData}
-                  >
-                      <MaterialCommunityIcons name="delete-sweep" size={18} color="#fff" />
-                      <ThemedText style={styles.devButtonText}>Tümünü Sil</ThemedText>
-                  </TouchableOpacity>
-              </View>
 
               <View style={styles.statsGrid}>
                   <View style={[styles.statCard, {backgroundColor: colors.card}]}>
@@ -501,6 +485,41 @@ export default function ReportsScreen() {
                       )}
                   </>
               )}
+
+              <View style={styles.devToggleWrapper}>
+                  <TouchableOpacity
+                      style={[styles.devToggle, {borderColor: colors.border}]}
+                      onPress={() => setDevToolsOpen(prev => !prev)}
+                      activeOpacity={0.7}
+                  >
+                      <MaterialCommunityIcons name="database-outline" size={14} color={colors.text} />
+                      <ThemedText style={[styles.devToggleText, {color: colors.text, opacity: 0.65}]}>Test araçları</ThemedText>
+                      <MaterialCommunityIcons
+                          name={devToolsOpen ? 'chevron-up' : 'chevron-down'}
+                          size={14}
+                          color={colors.text}
+                      />
+                  </TouchableOpacity>
+              </View>
+
+              {devToolsOpen && (
+                  <View style={styles.devButtonsContainer}>
+                      <TouchableOpacity 
+                          style={[styles.devButton, {backgroundColor: colors.primary}]} 
+                          onPress={handleAddFakeData}
+                      >
+                          <MaterialCommunityIcons name="database-plus" size={18} color="#fff" />
+                          <ThemedText style={styles.devButtonText}>Test Verisi Ekle</ThemedText>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                          style={[styles.devButton, {backgroundColor: '#d9534f'}]} 
+                          onPress={handleClearData}
+                      >
+                          <MaterialCommunityIcons name="delete-sweep" size={18} color="#fff" />
+                          <ThemedText style={styles.devButtonText}>Tümünü Sil</ThemedText>
+                      </TouchableOpacity>
+                  </View>
+              )}
           </ScrollView>
       </SafeAreaView>
   );
@@ -519,9 +538,29 @@ const styles = StyleSheet.create({
         marginBottom: 25,
         fontSize: 24,
     },
+    devToggleWrapper: {
+        alignItems: 'center',
+        marginTop: 12,
+        marginBottom: 6,
+    },
+    devToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
+        borderWidth: 1,
+        backgroundColor: 'transparent',
+    },
+    devToggleText: {
+        fontSize: 11,
+        fontWeight: '600',
+        marginHorizontal: 8,
+    },
     devButtonsContainer: {
         flexDirection: 'row',
-        marginBottom: 20,
+        marginTop: 8,
+        marginBottom: 24,
         paddingHorizontal: 5,
         justifyContent: 'space-between',
     },
