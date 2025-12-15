@@ -27,6 +27,7 @@
     "expo-image": "~3.0.11",
     "expo-keep-awake": "~15.0.8",
     "expo-linking": "~8.0.10",
+    "expo-notifications": "~0.32.15",
     "expo-router": "~6.0.19",
     "expo-splash-screen": "~31.0.12",
     "expo-sqlite": "~16.0.10",
@@ -48,10 +49,11 @@
     "@types/estree": "^1.0.8",
     "@types/json-schema": "^7.0.15",
     "@types/react": "~19.1.0",
+    "cross-env": "^7.0.3",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
-    "typescript": "~5.9.2",
-    "cross-env": "^7.0.3"
+    "expo-module-scripts": "^5.0.8",
+    "typescript": "~5.9.2"
   },
   "resolutions": {
     "use-latest-callback": "^0.1.13"

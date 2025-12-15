@@ -6,9 +6,10 @@ export const CATEGORIES = [
   'Diğer'
 ] as const;
 
-export const DEFAULT_DURATION = 25 * 60;
+export const DEFAULT_DURATION = 10; // 10 saniye
 
 export const TIMER_DURATIONS = [
+  { label: '10 saniye', value: 10 },
   { label: '5 dakika', value: 5 * 60 },
   { label: '10 dakika', value: 10 * 60 },
   { label: '15 dakika', value: 15 * 60 },
