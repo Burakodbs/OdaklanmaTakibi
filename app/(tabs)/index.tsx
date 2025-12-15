@@ -2,10 +2,10 @@ import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { database } from '@/services/database';
-import { CATEGORIES, DEFAULT_DURATION, formatTime } from '@/utils/constants';
+import { CATEGORIES, DEFAULT_DURATION, formatTime, TIMER_DURATIONS } from '@/utils/constants';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     Alert,
     Animated,
@@ -26,6 +26,7 @@ export default function TimerScreen() {
     const colorScheme = useColorScheme();
     const colors = Colors[colorScheme ?? 'light'];
 
+    const [selectedDuration, setSelectedDuration] = useState(DEFAULT_DURATION);
     const [timeLeft, setTimeLeft] = useState(DEFAULT_DURATION);
     const [isRunning, setIsRunning] = useState(false);
     const [category, setCategory] = useState(CATEGORIES[0]);
@@ -74,7 +75,7 @@ export default function TimerScreen() {
             setTimeLeft(prev => {
                 if (prev <= 1) {
                     if (intervalRef.current) clearInterval(intervalRef.current);
-                    const duration = DEFAULT_DURATION;
+                    const duration = selectedDuration;
                     setSessionDuration(duration);
                     setSessionCompleted(true);
                     saveSession(duration, true);
@@ -85,7 +86,7 @@ export default function TimerScreen() {
                 return prev - 1;
             });
         }, 1000);
-    }, [isRunning, saveSession]);
+    }, [isRunning, saveSession, selectedDuration]);
 
     const handlePause = useCallback(() => {
         setIsRunning(false);
@@ -101,35 +102,73 @@ export default function TimerScreen() {
                 if (isRunningRef.current) {
                     setDistractions(prev => prev + 1);
                     handlePause();
-                    Alert.alert('Dikkat Dağınıklığı', 'Uygulamadan ayrıldınız. Sayaç duraklatıldı.', [{text: 'Tamam'}]);
+                }
+            } else if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
+                // Kullanıcı uygulamaya geri döndü
+                if (timeLeft > 0 && timeLeft < selectedDuration && !isRunning) {
+                    Alert.alert(
+                        'Hoş Geldin!',
+                        'Sayacı devam ettirmek ister misin?',
+                        [
+                            {text: 'Hayır', style: 'cancel'},
+                            {text: 'Evet', onPress: handleStart}
+                        ]
+                    );
                 }
             }
             appStateRef.current = nextAppState;
         });
         return () => subscription.remove();
-    }, [handlePause]);
+    }, [handlePause, handleStart, timeLeft, selectedDuration, isRunning]);
 
     const handleReset = useCallback(() => {
         handlePause();
-        setTimeLeft(DEFAULT_DURATION);
+        setTimeLeft(selectedDuration);
         setDistractions(0);
         setShowSummary(false);
-    }, [handlePause]);
+    }, [handlePause, selectedDuration]);
 
     const handleStop = useCallback(() => {
-        if (!isRunning && timeLeft === DEFAULT_DURATION) return;
+        if (!isRunning && timeLeft === selectedDuration) return;
         handlePause();
-        const duration = DEFAULT_DURATION - timeLeft;
+        const duration = selectedDuration - timeLeft;
         setSessionDuration(duration);
         setSessionCompleted(false);
         saveSession(duration, false);
         setShowSummary(true);
-    }, [isRunning, timeLeft, handlePause, saveSession]);
+    }, [isRunning, timeLeft, handlePause, saveSession, selectedDuration]);
 
     const closeSummary = useCallback(() => {
         setShowSummary(false);
         handleReset();
     }, [handleReset]);
+
+    const handleDurationChange = useCallback((duration: number) => {
+        if (isRunning) {
+            Alert.alert('Uyarı', 'Sayaç çalışırken süre değiştiremezsiniz.');
+            return;
+        }
+        setSelectedDuration(duration);
+        setTimeLeft(duration);
+    }, [isRunning]);
+
+    const adjustTime = useCallback((minutes: number) => {
+        if (isRunning) {
+            Alert.alert('Uyarı', 'Sayaç çalışırken süre değiştiremezsiniz.');
+            return;
+        }
+        const newDuration = selectedDuration + (minutes * 60);
+        if (newDuration < 60) {
+            Alert.alert('Uyarı', 'Süre en az 1 dakika olmalıdır.');
+            return;
+        }
+        if (newDuration > 3600) {
+            Alert.alert('Uyarı', 'Süre en fazla 60 dakika olabilir.');
+            return;
+        }
+        setSelectedDuration(newDuration);
+        setTimeLeft(newDuration);
+    }, [isRunning, selectedDuration]);
 
   return (
       <SafeAreaView style={[styles.container, {backgroundColor: colors.background}]} edges={['top']}>
@@ -146,6 +185,56 @@ export default function TimerScreen() {
 
               <View style={styles.controlsContainer}>
                   <View style={[styles.card, {backgroundColor: colors.card}]}>
+                      <View style={styles.pickerHeader}>
+                          <MaterialCommunityIcons name="clock-outline" size={20} color={colors.text}/>
+                          <ThemedText style={styles.cardTitle}>Süre</ThemedText>
+                      </View>
+                      
+                      <View style={styles.durationRow}>
+                          <TouchableOpacity 
+                              style={[styles.adjustButton, {backgroundColor: colors.primary, opacity: isRunning ? 0.5 : 1}]} 
+                              onPress={() => adjustTime(-5)}
+                              disabled={isRunning}
+                              activeOpacity={0.7}
+                          >
+                              <MaterialCommunityIcons name="minus" size={20} color="#ffffff"/>
+                              <ThemedText style={styles.adjustButtonText}>5dk</ThemedText>
+                          </TouchableOpacity>
+                          
+                          <View style={styles.pickerWrapper}>
+                              <Picker
+                                  selectedValue={selectedDuration}
+                                  onValueChange={handleDurationChange}
+                                  enabled={!isRunning}
+                                  mode="dropdown"
+                                  dropdownIconColor={colors.text}
+                                  style={[styles.picker, {color: colors.text, backgroundColor: colors.card}]}
+                              >
+                                  {TIMER_DURATIONS.map(duration => (
+                                      <Picker.Item 
+                                          key={duration.value} 
+                                          label={duration.label} 
+                                          value={duration.value} 
+                                          color={colorScheme === 'dark' ? '#ffffff' : '#000000'}
+                                          style={{backgroundColor: colorScheme === 'dark' ? '#1e1e1e' : '#ffffff'}}
+                                      />
+                                  ))}
+                              </Picker>
+                          </View>
+                          
+                          <TouchableOpacity 
+                              style={[styles.adjustButton, {backgroundColor: colors.primary, opacity: isRunning ? 0.5 : 1}]} 
+                              onPress={() => adjustTime(5)}
+                              disabled={isRunning}
+                              activeOpacity={0.7}
+                          >
+                              <MaterialCommunityIcons name="plus" size={20} color="#ffffff"/>
+                              <ThemedText style={styles.adjustButtonText}>5dk</ThemedText>
+                          </TouchableOpacity>
+                      </View>
+                  </View>
+
+                  <View style={[styles.card, {backgroundColor: colors.card, marginTop: 12}]}>
                       <View style={styles.pickerHeader}>
                           <MaterialCommunityIcons name="format-list-bulleted-type" size={20} color={colors.text}/>
                           <ThemedText style={styles.cardTitle}>Kategori</ThemedText>
@@ -186,7 +275,7 @@ export default function TimerScreen() {
                       </TouchableOpacity>
                   )}
                   <TouchableOpacity style={[styles.button, styles.stopButton]} onPress={handleStop}
-                                    disabled={!isRunning && timeLeft === DEFAULT_DURATION} activeOpacity={0.7}>
+                                    disabled={!isRunning && timeLeft === selectedDuration} activeOpacity={0.7}>
                       <MaterialCommunityIcons name="stop" size={24} color="#ffffff"/>
                       <ThemedText style={styles.buttonText}>Bitir</ThemedText>
                   </TouchableOpacity>
@@ -315,6 +404,30 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
         marginLeft: 8,
+    },
+    durationRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginTop: 4,
+    },
+    adjustButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        gap: 4,
+        minWidth: 60,
+    },
+    adjustButtonText: {
+        color: '#ffffff',
+        fontSize: 12,
+        fontWeight: 'bold',
+    },
+    pickerWrapper: {
+        flex: 1,
     },
     picker: {
         width: '100%',

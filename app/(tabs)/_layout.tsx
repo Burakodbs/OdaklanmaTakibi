@@ -48,6 +48,15 @@ export default function TabLayout() {
             ),
         }}
       />
+      <Tabs.Screen
+        name="goals"
+        options={{
+            title: 'Hedefler',
+            tabBarIcon: ({color, size}) => (
+                <MaterialCommunityIcons name="trophy" color={color} size={size}/>
+            ),
+        }}
+      />
     </Tabs>
   );
 }

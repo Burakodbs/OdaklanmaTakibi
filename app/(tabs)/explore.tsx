@@ -5,7 +5,7 @@ import { database, FocusSession } from '@/services/database';
 import { formatDuration } from '@/utils/constants';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Alert, Dimensions, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { BarChart, PieChart } from 'react-native-chart-kit';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,6 +27,9 @@ export default function ReportsScreen() {
         color: string;
         legendFontColor: string
     }[]>([]);
+    const [monthlyCalendar, setMonthlyCalendar] = useState<{date: string; hasSessions: boolean; duration: number}[]>([]);
+    const [selectedMonth, setSelectedMonth] = useState(new Date());
+    const [dailyGoal, setDailyGoal] = useState(2 * 60 * 60); // 2 saat default
     const [refreshing, setRefreshing] = useState(false);
 
     const processWeeklyData = useCallback((sessions: FocusSession[]) => {
@@ -49,7 +52,8 @@ export default function ReportsScreen() {
     }, []);
 
     const processCategoryData = useCallback((sessions: FocusSession[]) => {
-        const categoryColors = [colors.primary, colors.secondary, '#FF6F00', '#2962FF', '#00BFA5', '#D500F9'];
+        // Yüksek kontrastlı, birbirinden farklı renkler
+        const categoryColors = ['#FF3B30', '#34C759', '#007AFF', '#FF9500', '#AF52DE', '#FF2D55'];
         const categoryMap = new Map<string, number>();
 
         sessions.forEach(s => {
@@ -61,10 +65,9 @@ export default function ReportsScreen() {
         const data = Array.from(categoryMap.entries())
             .filter(([_, duration]) => duration > 0)
             .map(([name, duration], index) => {
-                const minutes = Math.round(duration / 60);
                 const percentage = ((duration / total) * 100).toFixed(1);
                 return {
-                    name: `${name}: ${minutes}dk`,
+                    name: `${name}`,
                     population: parseFloat(percentage),
                     color: categoryColors[index % categoryColors.length],
                     legendFontColor: colorScheme === 'dark' ? '#FFFFFF' : '#1C1C1E',
@@ -74,6 +77,29 @@ export default function ReportsScreen() {
 
         setCategoryData(data);
     }, [colors.primary, colors.secondary, colorScheme]);
+
+    const processMonthlyCalendar = useCallback((sessions: FocusSession[], month: Date) => {
+        const year = month.getFullYear();
+        const monthIndex = month.getMonth();
+        const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+        
+        const calendar: {date: string; hasSessions: boolean; duration: number}[] = [];
+        
+        for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(year, monthIndex, day);
+            const dateStr = date.toISOString().split('T')[0];
+            const daySessions = sessions.filter(s => s.date.startsWith(dateStr));
+            const duration = daySessions.reduce((sum, s) => sum + s.duration, 0);
+            
+            calendar.push({
+                date: dateStr,
+                hasSessions: daySessions.length > 0,
+                duration
+            });
+        }
+        
+        setMonthlyCalendar(calendar);
+    }, []);
 
     const loadData = useCallback(async () => {
         try {
@@ -91,16 +117,22 @@ export default function ReportsScreen() {
 
             processWeeklyData(weeklySessions);
             processCategoryData(allSessions);
+            processMonthlyCalendar(allSessions, selectedMonth);
         } catch (error) {
             console.error('Veri yüklenemedi:', error);
         }
-    }, [processWeeklyData, processCategoryData]);
+    }, [processWeeklyData, processCategoryData, processMonthlyCalendar, selectedMonth]);
 
     useFocusEffect(
         useCallback(() => {
             loadData();
         }, [loadData])
     );
+
+    // Ay değiştiğinde takvimi güncelle
+    React.useEffect(() => {
+        loadData();
+    }, [selectedMonth]);
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
@@ -111,7 +143,7 @@ export default function ReportsScreen() {
     const handleAddFakeData = async () => {
         Alert.alert(
             'Test Verisi Ekle',
-            'Son 7 gün için fake veriler eklenecek. Onaylıyor musunuz?',
+            'Son 30 gün için fake veriler eklenecek. Onaylıyor musunuz?',
             [
                 { text: 'İptal', style: 'cancel' },
                 {
@@ -254,6 +286,108 @@ export default function ReportsScreen() {
                               />
                           </View>
                       )}
+
+                      {monthlyCalendar.length > 0 && (
+                          <View style={[styles.chartWrapper, {backgroundColor: colors.card}]}>
+                              <View style={styles.calendarHeader}>
+                                  <TouchableOpacity 
+                                      onPress={() => {
+                                          const newMonth = new Date(selectedMonth);
+                                          newMonth.setMonth(newMonth.getMonth() - 1);
+                                          setSelectedMonth(newMonth);
+                                      }}
+                                      style={styles.monthButton}
+                                  >
+                                      <MaterialCommunityIcons name="chevron-left" size={24} color={colors.text} />
+                                  </TouchableOpacity>
+                                  
+                                  <ThemedText style={[styles.chartTitle, {color: colors.text}]}>
+                                      {selectedMonth.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
+                                  </ThemedText>
+                                  
+                                  <TouchableOpacity 
+                                      onPress={() => {
+                                          const newMonth = new Date(selectedMonth);
+                                          newMonth.setMonth(newMonth.getMonth() + 1);
+                                          setSelectedMonth(newMonth);
+                                      }}
+                                      style={styles.monthButton}
+                                  >
+                                      <MaterialCommunityIcons name="chevron-right" size={24} color={colors.text} />
+                                  </TouchableOpacity>
+                              </View>
+                              
+                              <View style={styles.calendarContainer}>
+                                  <View style={styles.weekDaysRow}>
+                                      {['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].map((day, i) => (
+                                          <ThemedText key={i} style={[styles.weekDay, {color: colors.text}]}>{day}</ThemedText>
+                                      ))}
+                                  </View>
+                                  <View style={styles.calendarGrid}>
+                                      {(() => {
+                                          const today = new Date();
+                                          const firstDay = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
+                                          const startDayOfWeek = (firstDay.getDay() + 6) % 7; // 0 = Pazartesi
+                                          
+                                          const days = [];
+                                          
+                                          // Boş hücreler ekle
+                                          for (let i = 0; i < startDayOfWeek; i++) {
+                                              days.push(<View key={`empty-${i}`} style={styles.dayCell} />);
+                                          }
+                                          
+                                          // Günleri ekle
+                                          monthlyCalendar.forEach((dayData) => {
+                                              const date = new Date(dayData.date);
+                                              const dayNumber = date.getDate();
+                                              const isToday = dayData.date === today.toISOString().split('T')[0];
+                                              
+                                              // Hedefe göre renk hesapla
+                                              let backgroundColor = 'transparent';
+                                              if (dayData.hasSessions && dayData.duration > 0) {
+                                                  const goalRatio = dayData.duration / dailyGoal;
+                                                  
+                                                  if (goalRatio >= 1) {
+                                                      // Hedef aşıldı - yeşil tonları
+                                                      const intensity = Math.min((goalRatio - 1) * 0.5 + 0.5, 1);
+                                                      backgroundColor = `rgba(52, 199, 89, ${intensity})`; // #34C759
+                                                  } else if (goalRatio >= 0.5) {
+                                                      // Hedefe yakın - sarı-yeşil
+                                                      const intensity = 0.3 + (goalRatio * 0.5);
+                                                      backgroundColor = `rgba(255, 204, 0, ${intensity})`; // #FFCC00
+                                                  } else {
+                                                      // Hedeften uzak - kırmızı tonları
+                                                      const intensity = 0.3 + (goalRatio * 0.4);
+                                                      backgroundColor = `rgba(255, 59, 48, ${intensity})`; // #FF3B30
+                                                  }
+                                              }
+                                              
+                                              days.push(
+                                                  <View 
+                                                      key={dayData.date} 
+                                                      style={[
+                                                          styles.dayCell,
+                                                          { backgroundColor },
+                                                          isToday && styles.todayCell
+                                                      ]}
+                                                  >
+                                                      <ThemedText style={[
+                                                          styles.dayNumber,
+                                                          {color: colors.text},
+                                                          isToday && styles.todayText
+                                                      ]}>
+                                                          {dayNumber}
+                                                      </ThemedText>
+                                                  </View>
+                                              );
+                                          });
+                                          
+                                          return days;
+                                      })()}
+                                  </View>
+                              </View>
+                          </View>
+                      )}
                   </>
               )}
           </ScrollView>
@@ -363,5 +497,61 @@ const styles = StyleSheet.create({
         fontSize: 14,
         textAlign: 'center',
         opacity: 0.7,
+    },
+    calendarContainer: {
+        width: '100%',
+        paddingHorizontal: 12,
+    },
+    calendarHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+        paddingHorizontal: 12,
+        width: '100%',
+    },
+    monthButton: {
+        padding: 8,
+        borderRadius: 8,
+    },
+    weekDaysRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-start',
+        marginBottom: 8,
+        paddingHorizontal: 4,
+        gap: 4,
+    },
+    weekDay: {
+        width: 40,
+        textAlign: 'center',
+        fontSize: 12,
+        fontWeight: '600',
+        opacity: 0.6,
+    },
+    calendarGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 4,
+        justifyContent: 'flex-start',
+        paddingHorizontal: 4,
+    },
+    dayCell: {
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 8,
+        position: 'relative',
+    },
+    todayCell: {
+        borderWidth: 2,
+        borderColor: '#007AFF',
+    },
+    dayNumber: {
+        fontSize: 13,
+        fontWeight: '500',
+    },
+    todayText: {
+        fontWeight: 'bold',
     },
 });

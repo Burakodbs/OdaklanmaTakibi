@@ -5,7 +5,7 @@ import { database } from '@/services/database';
 import { ACHIEVEMENTS, formatDuration } from '@/utils/constants';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
     Alert,
     Modal,
@@ -202,12 +202,7 @@ export default function GoalsScreen() {
                         </View>
                     </View>
 
-                    <View style={[styles.streakInfo, { backgroundColor: colors.background }]}>
-                        <MaterialCommunityIcons name="information" size={16} color={colors.text} />
-                        <ThemedText style={[styles.streakInfoText, { color: colors.text }]}>
-                            Her gün hedefini tamamlayarak streakini artır!
-                        </ThemedText>
-                    </View>
+                   
                 </View>
 
                 <View style={[styles.weeklyCard, { backgroundColor: colors.card }]}>

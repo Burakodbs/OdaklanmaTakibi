@@ -8,6 +8,17 @@ export const CATEGORIES = [
 
 export const DEFAULT_DURATION = 25 * 60;
 
+export const TIMER_DURATIONS = [
+  { label: '5 dakika', value: 5 * 60 },
+  { label: '10 dakika', value: 10 * 60 },
+  { label: '15 dakika', value: 15 * 60 },
+  { label: '20 dakika', value: 20 * 60 },
+  { label: '25 dakika', value: 25 * 60 },
+  { label: '30 dakika', value: 30 * 60 },
+  { label: '45 dakika', value: 45 * 60 },
+  { label: '60 dakika', value: 60 * 60 },
+] as const;
+
 export const NORMAL_DURATIONS = [
   { label: '15 dakika', value: 15 * 60 },
   { label: '25 dakika', value: 25 * 60 },
